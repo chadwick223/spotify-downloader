@@ -5,7 +5,6 @@ MusixMatch lyrics provider.
 import json
 import logging
 import time
-from getpass import getpass
 from typing import Dict, List, Optional
 from urllib.parse import quote
 
@@ -33,11 +32,11 @@ class MusixMatch(LyricsProvider):
     ##password: Password used to authenticate using Musixmatch
     ## cookies : Cookies obtained from the authenticated browser session.
 
-    def __init__(self):
+    def __init__(self, email: str, password: str):
 
         super().__init__()
-        self.email = input("enter email for musixmatch ")
-        self.password = input("Enter Password")
+        self.email = email
+        self.password = password
         try:
             loop = asyncio.get_event_loop()
         except RuntimeError:
@@ -192,9 +191,8 @@ class MusixMatch(LyricsProvider):
             if url:
                 results[title] = url
 
-        track_list = body.get("track_list", [])
-        for item in track_list:
-            track = item.get("track", {})
+        track_list = body.get("tracks", [])
+        for track in track_list:
 
             title = f"{track.get('track_name','')} - {track.get('artist_name','')}"
             url = track.get("track_share_url")

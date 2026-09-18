@@ -134,6 +134,18 @@ def parse_main_options(parser: _ArgumentGroup):
         help="Lets you choose your own Genius access token.",
     )
 
+    parser.add_argument(
+        "--musixmatch-email",
+        dest="musixmatch_email",
+        help="Your MusixMatch login email. Needed to use the MusixMatch lyrics provider.",
+    )
+
+    parser.add_argument(
+        "--musixmatch-password",
+        dest="musixmatch_password",
+        help="Your MusixMatch login password. Needed to use the MusixMatch lyrics provider.",
+    )
+
     # Add config argument
     parser.add_argument(
         "--config",
