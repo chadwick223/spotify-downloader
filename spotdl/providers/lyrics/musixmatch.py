@@ -2,14 +2,11 @@
 MusixMatch lyrics provider.
 """
 
+import asyncio
 import json
-import logging
-import time
-from getpass import getpass
 from typing import Dict, List, Optional
 from urllib.parse import quote
 
-# import requests
 from bs4 import BeautifulSoup
 from curl_cffi import requests
 from playwright.async_api import async_playwright
@@ -25,8 +22,6 @@ import asyncio
 class MusixMatch(LyricsProvider):
     """
     MusixMatch lyrics provider class.
-
-
     """
     
     ## email : Email address used to authenticate using Musixmatch
@@ -34,6 +29,12 @@ class MusixMatch(LyricsProvider):
     ## cookies : Cookies obtained from the authenticated browser session.
 
     def __init__(self):
+        """
+        ### Notes
+        - email: Email address used to authenticate using Musixmatch
+        - password: Password used to authenticate using Musixmatch
+        - cookies: Cookies obtained from the authenticated browser session.
+        """
 
         super().__init__()
         self.email = input("enter email for musixmatch ")
@@ -60,28 +61,20 @@ class MusixMatch(LyricsProvider):
 
             browser = await p.chromium.launch(headless=True)
             page = await browser.new_page()
-
             await page.goto("https://www.musixmatch.com/")
 
             await page.click("text= Login")
-
             card = page.locator("div[tabindex='0']").filter(has_text="Community")
             await card.wait_for(state="visible")
-
             await card.click()
 
             email_btn = page.get_by_text("Continue with email")
-
             await email_btn.wait_for(state="visible")
-
             await email_btn.click()
 
             await page.wait_for_selector("input[type='email']", state="visible")
-
             await page.fill("input[type ='Email']", self.email)
-
             await page.fill("input[type ='Password']", self.password)
-
             await page.get_by_text("Sign in", exact=True).click()
 
             await page.wait_for_url(
@@ -89,7 +82,6 @@ class MusixMatch(LyricsProvider):
             )
 
             playwright_cookies = await page.context.cookies()
-
             cookies_dict = {c["name"]: c["value"] for c in playwright_cookies}
 
             await browser.close()
@@ -138,6 +130,7 @@ class MusixMatch(LyricsProvider):
         ### Returns
         - A dictionary with the results. (The key is the title and the value is the url.)
         """
+
         track_search = kwargs.get("track_search", False)
         artists_str = ", ".join(
             artist for artist in artists if artist.lower() not in name.lower()
@@ -147,12 +140,7 @@ class MusixMatch(LyricsProvider):
         # e.g "Au/Ra" -> "Au%2FRa"
         query = quote(f"{name} - {artists_str}", safe="")
 
-        # search the `tracks page` if track_search is True
-        # if track_search:
-        #     query += "%20tracks"
-
         search_url = f"https://www.musixmatch.com/search?query={query}"
-
         search_resp = requests.get(
             search_url,
             impersonate="chrome110",
@@ -168,23 +156,20 @@ class MusixMatch(LyricsProvider):
                 f"Received HTTP {search_resp.status_code} from {search_url}"
             )
 
-        soup = BeautifulSoup(search_resp.text, "html.parser")
-        script_tag = soup.find("script", id="__NEXT_DATA__")
+        search_soup = BeautifulSoup(search_resp.text, "html.parser")
+        script_tag = search_soup.find("script", id="__NEXT_DATA__")
 
         if not script_tag:
             return {}
+        
         json_text = script_tag.string
-
         data = json.loads(json_text)
 
         page_data = data["props"]["pageProps"]["data"]
-
         body = page_data["openSearch"]["data"]["opensearchTrackSearch"]["body"]
 
         results = {}
-
         best_match = body.get("bestMatch")
-
         if best_match:
             title = f"{best_match.get('track_name','')} - {best_match.get('artist_name','')}"
 
