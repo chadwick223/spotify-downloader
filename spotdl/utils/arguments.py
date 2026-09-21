@@ -123,7 +123,9 @@ def parse_main_options(parser: _ArgumentGroup):
         choices=LYRICS_PROVIDERS.keys(),
         help=(
             "The lyrics provider to use. You can provide more than one for fallback. "
-            "For MusixMatch, create an account via 'Continue with email' at https://auth.musixmatch.com/, and specify --musixmatch-email and --musixmatch-password. "
+            "For MusixMatch, create an account via 'Continue with email' at "
+            "https://auth.musixmatch.com/, and specify --musixmatch-email and "
+            "--musixmatch-password. "
             "Synced lyrics might not work correctly with some music players. "
             "For such cases it's better to use `--generate-lrc` option."
         ),
@@ -138,13 +140,21 @@ def parse_main_options(parser: _ArgumentGroup):
     parser.add_argument(
         "--musixmatch-email",
         dest="musixmatch_email",
-        help="Your MusixMatch login email. Create an account via 'Continue with email' at https://auth.musixmatch.com/ to use the MusixMatch lyrics provider.",
+        help=(
+            "Your MusixMatch login email. Create an account via 'Continue with "
+            "email' at https://auth.musixmatch.com/ to use the MusixMatch "
+            "lyrics provider."
+        ),
     )
 
     parser.add_argument(
         "--musixmatch-password",
         dest="musixmatch_password",
-        help="Your MusixMatch login password. Create an account via 'Continue with email' at https://auth.musixmatch.com/ to use the MusixMatch lyrics provider.",
+        help=(
+            "Your MusixMatch login password. Create an account via 'Continue with "
+            "email' at https://auth.musixmatch.com/ to use the MusixMatch "
+            "lyrics provider."
+        ),
     )
 
     # Add config argument
