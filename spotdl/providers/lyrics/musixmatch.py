@@ -4,10 +4,11 @@ MusixMatch lyrics provider.
 
 import asyncio
 import json
+import logging
 from typing import Dict, List, Optional
 from urllib.parse import quote
 
-from bs4 import BeautifulSoup
+from bs4 import BeautifulSoup, Tag
 from curl_cffi import requests
 from playwright.async_api import async_playwright
 
@@ -16,29 +17,27 @@ from spotdl.utils.config import GlobalConfig
 
 __all__ = ["MusixMatch"]
 logger = logging.getLogger(__name__)
-import asyncio
 
 
 class MusixMatch(LyricsProvider):
     """
     MusixMatch lyrics provider class.
     """
-    
+
     ## email : Email address used to authenticate using Musixmatch
-    ##password: Password used to authenticate using Musixmatch
+    ## password: Password used to authenticate using Musixmatch
     ## cookies : Cookies obtained from the authenticated browser session.
 
-    def __init__(self):
+    def __init__(self, email: str, password: str):
         """
         ### Notes
         - email: Email address used to authenticate using Musixmatch
         - password: Password used to authenticate using Musixmatch
         - cookies: Cookies obtained from the authenticated browser session.
         """
-
         super().__init__()
-        self.email = input("enter email for musixmatch ")
-        self.password = input("Enter Password")
+        self.email = email
+        self.password = password
         try:
             loop = asyncio.get_event_loop()
         except RuntimeError:
@@ -55,7 +54,6 @@ class MusixMatch(LyricsProvider):
             A dictionary containing the authenticated session cookies
         """
         async with async_playwright() as p:
-
 
             # Going to musixmatch to log in and get cookies for later use
 
@@ -77,9 +75,31 @@ class MusixMatch(LyricsProvider):
             await page.fill("input[type ='Password']", self.password)
             await page.get_by_text("Sign in", exact=True).click()
 
-            await page.wait_for_url(
-                lambda url: "auth.musixmatch.com" not in url, timeout=10000
+            # Waiting for either redirection (success) or a login failed alert (failure)
+
+            success = asyncio.ensure_future(
+                page.wait_for_url(
+                    lambda url: "auth.musixmatch.com" not in url, timeout=10000
+                )
             )
+            failure = asyncio.ensure_future(
+                page.locator("[role='alert']").wait_for(timeout=10000)
+            )
+            done, pending = await asyncio.wait(
+                {success, failure}, return_when=asyncio.FIRST_COMPLETED
+            )
+            for task in pending:
+                task.cancel()
+
+            if failure in done and failure.exception() is None:
+                raise RuntimeError(
+                    "MusixMatch login failed: invalid email or password.\n"
+                    "Remember that you have to create an account via 'Continue "
+                    "with email' at https://auth.musixmatch.com/."
+                )
+
+            if success not in done or success.exception() is not None:
+                raise RuntimeError("MusixMatch login timed out after 10 seconds.")
 
             playwright_cookies = await page.context.cookies()
             cookies_dict = {c["name"]: c["value"] for c in playwright_cookies}
@@ -109,7 +129,7 @@ class MusixMatch(LyricsProvider):
 
         lyrics_soup = BeautifulSoup(lyrics_resp.text, "html.parser")
         script_tag = lyrics_soup.find("script", id="__NEXT_DATA__")
-        if not script_tag:
+        if not isinstance(script_tag, Tag) or script_tag.string is None:
             return None
         data = json.loads(script_tag.string)
         page_data = data["props"]["pageProps"]["data"]
@@ -118,7 +138,7 @@ class MusixMatch(LyricsProvider):
 
         return lyrics
 
-    def get_results(self, name: str, artists: List[str], **kwargs) -> Dict[str, str]:
+    def get_results(self, name: str, artists: List[str], **_) -> Dict[str, str]:
         """
         Returns the results for the given song.
 
@@ -131,7 +151,6 @@ class MusixMatch(LyricsProvider):
         - A dictionary with the results. (The key is the title and the value is the url.)
         """
 
-        track_search = kwargs.get("track_search", False)
         artists_str = ", ".join(
             artist for artist in artists if artist.lower() not in name.lower()
         )
@@ -149,7 +168,9 @@ class MusixMatch(LyricsProvider):
             proxies=GlobalConfig.get_parameter("proxies"),
         )
 
-        logger.debug(f"Musixmatch search response status code: {search_resp.status_code}")
+        logger.debug(
+            f"Musixmatch search response status code: {search_resp.status_code}"
+        )
 
         if not search_resp.ok:
             raise RuntimeError(
@@ -159,11 +180,10 @@ class MusixMatch(LyricsProvider):
         search_soup = BeautifulSoup(search_resp.text, "html.parser")
         script_tag = search_soup.find("script", id="__NEXT_DATA__")
 
-        if not script_tag:
+        if not isinstance(script_tag, Tag) or script_tag.string is None:
             return {}
-        
-        json_text = script_tag.string
-        data = json.loads(json_text)
+
+        data = json.loads(script_tag.string)
 
         page_data = data["props"]["pageProps"]["data"]
         body = page_data["openSearch"]["data"]["opensearchTrackSearch"]["body"]
@@ -177,9 +197,8 @@ class MusixMatch(LyricsProvider):
             if url:
                 results[title] = url
 
-        track_list = body.get("track_list", [])
-        for item in track_list:
-            track = item.get("track", {})
+        track_list = body.get("tracks", [])
+        for track in track_list:
 
             title = f"{track.get('track_name','')} - {track.get('artist_name','')}"
             url = track.get("track_share_url")
