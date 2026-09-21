@@ -28,17 +28,17 @@ class MusixMatch(LyricsProvider):
     ##password: Password used to authenticate using Musixmatch
     ## cookies : Cookies obtained from the authenticated browser session.
 
-    def __init__(self):
+    def __init__(self, email: str, password: str):
         """
         ### Notes
         - email: Email address used to authenticate using Musixmatch
         - password: Password used to authenticate using Musixmatch
         - cookies: Cookies obtained from the authenticated browser session.
         """
-
+        
         super().__init__()
-        self.email = input("enter email for musixmatch ")
-        self.password = input("Enter Password")
+        self.email = email
+        self.password = password
         try:
             loop = asyncio.get_event_loop()
         except RuntimeError:
@@ -77,9 +77,29 @@ class MusixMatch(LyricsProvider):
             await page.fill("input[type ='Password']", self.password)
             await page.get_by_text("Sign in", exact=True).click()
 
-            await page.wait_for_url(
-                lambda url: "auth.musixmatch.com" not in url, timeout=10000
+            success = asyncio.ensure_future(
+                page.wait_for_url(
+                    lambda url: "auth.musixmatch.com" not in url, timeout=10000
+                )
             )
+            failure = asyncio.ensure_future(
+                page.locator("[role='alert']").wait_for(timeout=10000)
+            )
+            done, pending = await asyncio.wait(
+                {success, failure}, return_when=asyncio.FIRST_COMPLETED
+            )
+            for task in pending:
+                task.cancel()
+
+            if failure in done and failure.exception() is None:
+                raise RuntimeError(
+                    "MusixMatch login failed: invalid email or password.\nRemember that you have to create an account via 'Continue with email', see README.md/... for details."
+                )
+
+            if success not in done or success.exception() is not None:
+                raise RuntimeError(
+                    "MusixMatch login timed out after 10 seconds."
+                )
 
             playwright_cookies = await page.context.cookies()
             cookies_dict = {c["name"]: c["value"] for c in playwright_cookies}
@@ -177,9 +197,8 @@ class MusixMatch(LyricsProvider):
             if url:
                 results[title] = url
 
-        track_list = body.get("track_list", [])
-        for item in track_list:
-            track = item.get("track", {})
+        track_list = body.get("tracks", [])
+        for track in track_list:
 
             title = f"{track.get('track_name','')} - {track.get('artist_name','')}"
             url = track.get("track_share_url")
