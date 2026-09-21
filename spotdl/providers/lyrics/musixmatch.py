@@ -80,7 +80,11 @@ class MusixMatch(LyricsProvider):
 
             failure_locator = (
                 page.get_by_text(re.compile("wrong credentials", re.I))
-                .or_(page.get_by_text(re.compile("email or password are incorrect", re.I)))
+                .or_(
+                    page.get_by_text(
+                        re.compile("email or password are incorrect", re.I)
+                    )
+                )
                 .or_(page.get_by_text(re.compile("AUTH002", re.I)))
                 .or_(page.get_by_text(re.compile("SignIn error", re.I)))
             )
@@ -100,7 +104,8 @@ class MusixMatch(LyricsProvider):
 
             if failure in done and failure.exception() is None:
                 raise RuntimeError(
-                    f"MusixMatch login failed. Invalid email and password: {self.email} {self.password}\n"
+                    "MusixMatch login failed. Invalid email and password: "
+                    f"{self.email} {self.password}\n"
                     "Remember that you have to create an account via 'Continue "
                     "with email' at https://auth.musixmatch.com/."
                 )
