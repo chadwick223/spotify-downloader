@@ -5,6 +5,7 @@ MusixMatch lyrics provider.
 import asyncio
 import json
 import logging
+import re
 from typing import Dict, List, Optional
 from urllib.parse import quote
 
@@ -77,13 +78,23 @@ class MusixMatch(LyricsProvider):
 
             # Waiting for either redirection (success) or a login failed alert (failure)
 
+            failure_locator = (
+                page.get_by_text(re.compile("wrong credentials", re.I))
+                .or_(
+                    page.get_by_text(
+                        re.compile("email or password are incorrect", re.I)
+                    )
+                )
+                .or_(page.get_by_text(re.compile("AUTH002", re.I)))
+                .or_(page.get_by_text(re.compile("SignIn error", re.I)))
+            )
             success = asyncio.ensure_future(
                 page.wait_for_url(
                     lambda url: "auth.musixmatch.com" not in url, timeout=10000
                 )
             )
             failure = asyncio.ensure_future(
-                page.locator("[role='alert']").wait_for(timeout=10000)
+                failure_locator.first.wait_for(timeout=10000)
             )
             done, pending = await asyncio.wait(
                 {success, failure}, return_when=asyncio.FIRST_COMPLETED
@@ -93,7 +104,8 @@ class MusixMatch(LyricsProvider):
 
             if failure in done and failure.exception() is None:
                 raise RuntimeError(
-                    "MusixMatch login failed: invalid email or password.\n"
+                    "MusixMatch login failed. Invalid email and password: "
+                    f"{self.email} {self.password}\n"
                     "Remember that you have to create an account via 'Continue "
                     "with email' at https://auth.musixmatch.com/."
                 )
