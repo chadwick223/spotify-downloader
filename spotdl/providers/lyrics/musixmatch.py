@@ -4,6 +4,7 @@ MusixMatch lyrics provider.
 
 import asyncio
 import json
+import logging
 from typing import Dict, List, Optional
 from urllib.parse import quote
 
@@ -16,7 +17,6 @@ from spotdl.utils.config import GlobalConfig
 
 __all__ = ["MusixMatch"]
 logger = logging.getLogger(__name__)
-import asyncio
 
 
 class MusixMatch(LyricsProvider):
@@ -35,7 +35,6 @@ class MusixMatch(LyricsProvider):
         - password: Password used to authenticate using Musixmatch
         - cookies: Cookies obtained from the authenticated browser session.
         """
-        
         super().__init__()
         self.email = email
         self.password = password
