@@ -92,7 +92,7 @@ class MusixMatch(LyricsProvider):
 
             if failure in done and failure.exception() is None:
                 raise RuntimeError(
-                    "MusixMatch login failed: invalid email or password.\nRemember that you have to create an account via 'Continue with email', see README.md/... for details."
+                    "MusixMatch login failed: invalid email or password.\nRemember that you have to create an account via 'Continue with email' at https://auth.musixmatch.com/."
                 )
 
             if success not in done or success.exception() is not None:
